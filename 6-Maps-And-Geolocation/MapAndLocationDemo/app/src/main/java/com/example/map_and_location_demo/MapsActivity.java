@@ -3,17 +3,21 @@ package com.example.map_and_location_demo;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.location.Address;
+import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Toast;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -23,6 +27,10 @@ import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.example.map_and_location_demo.databinding.ActivityMapsBinding;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Locale;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
 
@@ -56,24 +64,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
-
-        locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
-        locationListener = new LocationListener() {
-            @Override
-            public void onLocationChanged(@NonNull Location location) {
-                Toast.makeText(MapsActivity.this, location.toString(), Toast.LENGTH_LONG).show();
-            }
-        };
-
-        if(Build.VERSION.SDK_INT < 23) {
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
-        } else {
-            if(ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.ACCESS_FINE_LOCATION}, 1);
-            } else {
-                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
-            }
-        }
     }
 
     /**
@@ -85,13 +75,67 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
      * it inside the SupportMapFragment. This method will only be triggered once the user has
      * installed Google Play services and returned to the app.
      */
+    @SuppressLint("MissingPermission")
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
 
-        // Add a marker in Sydney and move the camera
-        LatLng sydney = new LatLng(-34, 151);
-        mMap.addMarker(new MarkerOptions().position(sydney).title("Marker in Sydney"));
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
+        locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
+        locationListener = new LocationListener() {
+            @Override
+            public void onLocationChanged(@NonNull Location location) {
+//                Toast.makeText(MapsActivity.this, location.toString(), Toast.LENGTH_LONG).show();
+                mMap.clear();
+                LatLng userLocation = new LatLng(location.getLatitude(), location.getLongitude());
+                mMap.addMarker(new MarkerOptions().position(userLocation).title("Your Location"));
+                mMap.moveCamera(CameraUpdateFactory.newLatLng(userLocation));
+
+                Geocoder geocoder = new Geocoder(getApplicationContext(), Locale.getDefault());
+                try {
+                    List<Address> listAddresses = geocoder.getFromLocation(location.getLatitude(), location.getLongitude(), 1);
+
+                    if(listAddresses != null && listAddresses.size() > 0) {
+                        Log.i("PlaceInfo", listAddresses.get(0).toString());
+                        String address = "";
+
+                        if(listAddresses.get(0).getThoroughfare() != null) {
+                            address += listAddresses.get(0).getThoroughfare();
+                        }
+
+                        if(listAddresses.get(0).getLocality() != null) {
+                            address += listAddresses.get(0).getLocality() + ' ';
+                        }
+
+                        if(listAddresses.get(0).getPostalCode() != null) {
+                            address += listAddresses.get(0).getPostalCode() + ' ';
+                        }
+
+                        if(listAddresses.get(0).getAdminArea() != null) {
+                            address += listAddresses.get(0).getAdminArea();
+                        }
+                        Toast.makeText(MapsActivity.this, address, Toast.LENGTH_LONG).show();
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+
+        if(Build.VERSION.SDK_INT < 23) {
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
+        } else {
+            if(ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+            } else {
+                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
+                Location lastKnownLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                mMap.clear();
+                LatLng userLocation = new LatLng(lastKnownLocation.getLatitude(), lastKnownLocation.getLongitude());
+                mMap.addMarker(new MarkerOptions().position(userLocation).title("Your Location"));
+                mMap.moveCamera(CameraUpdateFactory.newLatLng(userLocation));
+            }
+        }
+
+
     }
 }
